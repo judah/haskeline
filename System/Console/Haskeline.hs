@@ -68,6 +68,7 @@ module System.Console.Haskeline(
                     getHistory,
                     putHistory,
                     modifyHistory,
+                    flushHistory,
                     -- * Ctrl-C handling
                     withInterrupt,
                     Interrupt(..),
@@ -93,6 +94,7 @@ import System.Console.Haskeline.RunCommand
 
 import System.IO
 import Data.Char (isSpace, isPrint)
+import Control.Monad (when)
 
 
 -- | A useful default.  In particular:
@@ -183,13 +185,16 @@ maybeAddHistory :: forall m . MonadIO m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates
+    doFlush <- InputT $ asks flushEveryCommand
     case result of
         Just line | autoAddHistory settings && not (all isSpace line)
             -> let adder = case histDupes of
                         AlwaysAdd -> addHistory
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
                         IgnoreAll -> addHistoryRemovingAllDupes
-               in modifyHistory (adder line)
+               in do
+                modifyHistory (adder line)
+                when doFlush flushHistory
         _ -> return ()
 
 ----------
