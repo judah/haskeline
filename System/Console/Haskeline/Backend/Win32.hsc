@@ -8,12 +8,17 @@ module System.Console.Haskeline.Backend.Win32(
 
 
 import System.IO
+import System.IO.Unsafe (unsafePerformIO)
 import Foreign
 import Foreign.C
 #if MIN_VERSION_Win32(2,9,0)
-import System.Win32 hiding (multiByteToWideChar, setConsoleMode, getConsoleMode)
+import System.Win32 hiding (getConsoleMode, isMinTTY, multiByteToWideChar,
+                           setConsoleMode, try)
+#elif MIN_VERSION_Win32(2,5,0)
+import System.Win32 hiding (isMinTTY, multiByteToWideChar, try)
 #else
-import System.Win32 hiding (multiByteToWideChar)
+import System.Win32 hiding (multiByteToWideChar, try)
+import System.Console.Mintty (isMinTTYHandle)
 #endif
 import Graphics.Win32.Misc(getStdHandle, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
@@ -21,7 +26,7 @@ import Control.Concurrent.STM
 import Control.Concurrent hiding (throwTo)
 import Data.Char(isPrint, chr, ord)
 import Data.Maybe(mapMaybe)
-import Control.Exception (IOException, throwTo)
+import Control.Exception (IOException, SomeException, throwTo, try)
 import Control.Monad
 import Control.Monad.Catch
     ( MonadThrow
@@ -261,16 +266,26 @@ foreign import WINDOWS_CCONV "windows.h GetConsoleMode" c_GetConsoleMode
 foreign import WINDOWS_CCONV "windows.h SetConsoleMode" c_SetConsoleMode
     :: HANDLE -> DWORD -> IO Bool
 
+#if !MIN_VERSION_Win32(2,8,5)
+eNABLE_VIRTUAL_TERMINAL_PROCESSING :: DWORD
+eNABLE_VIRTUAL_TERMINAL_PROCESSING =   4
+#endif
+
 withWindowMode :: (MonadIO m, MonadMask m) => Handles -> m a -> m a
 withWindowMode hs f = do
     let h = hIn hs
     bracket (getConsoleMode h) (setConsoleMode h)
             $ \m -> setConsoleMode h (m .|. (#const ENABLE_WINDOW_INPUT)) >> f
-  where
-    getConsoleMode h = liftIO $ alloca $ \p -> do
-            failIfFalse_ "GetConsoleMode" $ c_GetConsoleMode h p
-            peek p
-    setConsoleMode h m = liftIO $ failIfFalse_ "SetConsoleMode" $ c_SetConsoleMode h m
+
+getConsoleMode :: (MonadIO m) => HANDLE -> m DWORD
+getConsoleMode h = liftIO $ alloca $ \p -> do
+    failIfFalse_ "GetConsoleMode" $ c_GetConsoleMode h p
+    peek p
+
+setConsoleMode :: (MonadIO m) => HANDLE -> DWORD -> m ()
+setConsoleMode h m =
+    liftIO $ failIfFalse_ "SetConsoleMode" $ c_SetConsoleMode h m
+
 
 ----------------------------
 -- Drawing
@@ -369,9 +384,11 @@ crlf :: String
 crlf = "\r\n"
 
 instance (MonadMask m, MonadIO m, MonadReader Layout m) => Term (Draw m) where
-    drawLineDiff (xs1,ys1) (xs2,ys2) = let
-        fixEsc = filter ((/= '\ESC') . baseChar)
-        in drawLineDiffWin (fixEsc xs1, fixEsc ys1) (fixEsc xs2, fixEsc ys2)
+    drawLineDiff (xs1,ys1) (xs2,ys2) = if aNSISupport
+      then drawLineDiffWin (xs1,ys1) (xs2,ys2)
+      else
+        let fixEsc = filter ((/= '\ESC') . baseChar)
+        in  drawLineDiffWin (fixEsc xs1, fixEsc ys1) (fixEsc xs2, fixEsc ys2)
     -- TODO now that we capture resize events.
     -- first, looks like the cursor stays on the same line but jumps
     -- to the beginning if cut off.
@@ -567,3 +584,35 @@ clearScreen = do
     liftIO $ fillConsoleChar h ' ' windowSize origin
     liftIO $ fillConsoleAttribute h attr windowSize origin
     setPos origin
+
+-- | This function assumes that once it is first established whether or not the
+-- Windows console is ANSI-capable, that will not change.
+{-# NOINLINE aNSISupport #-}
+aNSISupport :: Bool
+aNSISupport = unsafePerformIO $ withHandleToHANDLE stdout $ withHANDLE
+  (return False)  -- Invalid handle or no handle
+  $ \h -> do
+    tryMode <- try (getConsoleMode h) :: IO (Either SomeException DWORD)
+    case tryMode of
+      Left _     -> do  -- No ConHost mode
+        isMinTTY <- isMinTTYHandle h
+        if isMinTTY
+          then return True  -- 'mintty' terminal emulator
+          else return False  -- Not sure!
+      Right mode -> if mode .&. eNABLE_VIRTUAL_TERMINAL_PROCESSING /= 0
+        then return True  -- VT processing already enabled
+        else do
+          let mode' = mode .|. eNABLE_VIRTUAL_TERMINAL_PROCESSING
+          trySetMode <- try (setConsoleMode h mode')
+            :: IO (Either SomeException ())
+          case trySetMode of
+            Left _   -> return False  -- Can't enable VT processing
+            Right () -> return True  -- VT processing enabled
+ where
+  -- | This function applies another to the Windows handle, if the handle is
+  -- valid. If it is invalid, the specified default action is returned.
+  withHANDLE :: IO a -> (HANDLE -> IO a) -> HANDLE -> IO a
+  withHANDLE invalid action h =
+    if h == iNVALID_HANDLE_VALUE || h == nullHANDLE
+      then invalid  -- Invalid handle or no handle
+      else action h
