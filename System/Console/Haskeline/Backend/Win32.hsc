@@ -355,9 +355,7 @@ crlf :: String
 crlf = "\r\n"
 
 instance (MonadMask m, MonadIO m, MonadReader Layout m) => Term (Draw m) where
-    drawLineDiff (xs1,ys1) (xs2,ys2) = let
-        fixEsc = filter ((/= '\ESC') . baseChar)
-        in drawLineDiffWin (fixEsc xs1, fixEsc ys1) (fixEsc xs2, fixEsc ys2)
+    drawLineDiff = drawLineDiffWin
     -- TODO now that we capture resize events.
     -- first, looks like the cursor stays on the same line but jumps
     -- to the beginning if cut off.
