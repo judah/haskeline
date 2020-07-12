@@ -119,8 +119,27 @@ stringToGraphemes = mkString . dropWhile isCombiningChar
         mkString ('\SOH':cs) = stringToGraphemes cs
         mkString ('\ESC':cs) | (ctrl,'\STX':rest) <- break (=='\STX') cs
                     = Grapheme '\ESC' ctrl : stringToGraphemes rest
+        mkString cs | Just (ctrl, rest) <- splitAnsiControl cs
+                    = Grapheme '\ESC' ctrl : stringToGraphemes rest
         mkString (c:cs) = Grapheme c (takeWhile isCombiningChar cs)
                                 : mkString (dropWhile isCombiningChar cs)
+        -- The ESC [ is followed by any number (including` none) of "parameter
+        -- bytes" in the range 0x30–0x3F (ASCII 0–9:;<=>?), then by any number
+        -- of "intermediate bytes" in the range 0x20–0x2F (ASCII space and
+        -- !"#$%&'()*+,-./), then finally by a single "final byte" in the range
+        -- 0x40–0x7E (ASCII @A–Z[\]^_`a–z{|}~).
+        -- http://www.ecma-international.org/publications/standards/Ecma-048.htm : 5.4`
+        splitAnsiControl :: String -> Maybe (String, String)
+        splitAnsiControl ('\ESC' : '[' : eRest) =
+          let (parameterBytes, pRest) = span (inRange 0x30 0x3F) eRest
+              (intermediateBytes, iRest) = span (inRange 0x20 0x2F) pRest
+              inRange _min _max c = ord c >= _min && ord c <= _max
+          in case iRest of
+            finalByte : rest | inRange 0x40 0x7E finalByte ->
+              Just ('[' : (parameterBytes ++ intermediateBytes ++ [finalByte])
+                   , rest)
+            _ -> Nothing
+        splitAnsiControl _ = Nothing
 
 graphemesToString :: [Grapheme] -> String
 graphemesToString = concatMap (\g -> (baseChar g : combiningChars g))

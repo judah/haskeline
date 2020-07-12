@@ -120,7 +120,8 @@ makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
     minColPad = 2
     printWidth = width layout
-    maxLength = min printWidth (maximum (map length ws) + minColPad)
+    plainLength = length . filter ((/= '\ESC') . baseChar) . stringToGraphemes
+    maxLength = min printWidth (maximum (map plainLength ws) + minColPad)
     numCols = printWidth `div` maxLength
     ls = if maxLength >= printWidth
                     then map (: []) ws
@@ -140,7 +141,7 @@ padWords len (x:xs) = x ++ replicate (len - glength x) ' '
         -- but don't use graphemes for the max length, since I'm not convinced
         -- that would work correctly. (This way, the worst that can happen is
         -- that columns are longer than necessary.)
-        glength = length . stringToGraphemes
+        glength = length . filter ((/= '\ESC') . baseChar) . stringToGraphemes
 
 -- Split xs into rows of length n,
 -- such that the list increases incrementally along the columns.
