@@ -39,6 +39,9 @@ module System.Console.Haskeline(
                     defaultBehavior,
                     useFileHandle,
                     useFile,
+#ifndef MINGW
+                    useTermHandles,
+#endif
                     preferTerm,
                     -- * User interaction functions
                     -- ** Reading user input
