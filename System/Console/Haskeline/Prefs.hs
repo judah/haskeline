@@ -48,7 +48,10 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- presses @TAB@ again.
                      customBindings :: Map.Map Key [Key],
                         -- (termName, keysequence, key)
-                     customKeySequences :: [(Maybe String, String,Key)]
+                     customKeySequences :: [(Maybe String, String,Key)],
+                     incAppendHistory :: Bool
+                        -- ^ If 'True' and @historyFile@ not 'Nothing'    
+                        -- flushes command history after every command
                      }
                         deriving Show
 
@@ -77,7 +80,8 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       listCompletionsImmediately = True,
                       historyDuplicates = AlwaysAdd,
                       customBindings = Map.empty,
-                      customKeySequences = []
+                      customKeySequences = [],
+                      incAppendHistory = False
                     }
 
 mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
@@ -100,6 +104,7 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("historyduplicates", mkSettor $ \x p -> p {historyDuplicates = x})
           ,("bind", addCustomBinding)
           ,("keyseq", addCustomKeySequence)
+          ,("incappendhistory", mkSettor $ \x p -> p {incAppendHistory = x})
           ]
 
 addCustomBinding :: String -> Prefs -> Prefs
