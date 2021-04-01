@@ -86,7 +86,7 @@ completeWordWithPrev esc ws f (line, _) = do
 
 -- | Create a finished completion out of the given word.
 simpleCompletion :: String -> Completion
-simpleCompletion = completion
+simpleCompletion =  Completion str str True
 
 -- NOTE: this is the same as for readline, except that I took out the '\\'
 -- so they can be used as a path separator.
@@ -98,9 +98,6 @@ completeFilename :: MonadIO m => CompletionFunc m
 completeFilename  = completeQuotedWord (Just '\\') "\"'" listFiles
                         $ completeWord (Just '\\') ("\"\'" ++ filenameWordBreakChars)
                                 listFiles
-
-completion :: String -> Completion
-completion str = Completion str str True
 
 setReplacement :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
@@ -165,7 +162,7 @@ listFiles path = liftIO $ do
     -- get all of the files in that directory, as basenames
     allFiles <- if not dirExists
                     then return []
-                    else fmap (map completion . filterPrefix)
+                    else fmap (map simpleCompletion . filterPrefix)
                             $ getDirectoryContents fixedDir
     -- The replacement text should include the directory part, and also
     -- have a trailing slash if it's itself a directory.
