@@ -15,6 +15,7 @@ import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Monads
 
+import Data.Char(toLower)
 import Data.List(transpose, unfoldr)
 
 useCompletion :: InsertMode -> Completion -> InsertMode
@@ -65,7 +66,7 @@ makePartialCompletion :: InsertMode -> [Completion] -> InsertMode
 makePartialCompletion im completions = insertString partial im
   where
     partial = foldl1 commonPrefix (map replacement completions)
-    commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
+    commonPrefix (c:cs) (d:ds) | toLower c == toLower d = c : commonPrefix cs ds
     commonPrefix _ _ = ""
 
 pagingCompletion :: MonadReader Layout m => Key -> Prefs
