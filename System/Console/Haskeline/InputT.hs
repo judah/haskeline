@@ -16,7 +16,7 @@ import Control.Monad.Catch
 import Control.Monad.Fail as Fail
 import Control.Monad.Fix
 import Data.IORef
-import System.Directory(getHomeDirectory)
+import System.Directory(getXdgDirectory, XdgDirectory(XdgConfig), doesFileExist, getHomeDirectory)
 import System.FilePath
 import System.IO
 
@@ -164,7 +164,7 @@ withBehavior (Behavior run) f = bracket (liftIO run) (liftIO . closeTerm) f
 runInputTBehavior :: (MonadIO m, MonadMask m) => Behavior -> Settings m -> InputT m a -> m a
 runInputTBehavior behavior settings f = withBehavior behavior $ \run -> do
     prefs <- if isTerminalStyle run
-                then liftIO readPrefsFromHome
+                then liftIO readUserPrefs
                 else return defaultPrefs
     execInputT prefs settings run f
 
@@ -217,10 +217,13 @@ preferTerm :: Behavior
 preferTerm = Behavior terminalRunTerm
 
 
--- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,
+-- | Read 'Prefs' from @$XDG_CONFIG_HOME/haskeline/haskeline@ if present
+-- ortherwise @~/.haskeline.@ If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
-readPrefsFromHome :: IO Prefs
-readPrefsFromHome = handle (\(_::IOException) -> return defaultPrefs) $ do
-    home <- getHomeDirectory
-    readPrefs (home </> ".haskeline")
+readUserPrefs :: IO Prefs
+readUserPrefs = handle (\(_::IOException) -> return defaultPrefs) $ do
+    xdg    <- getXdgDirectory XdgConfig ("haskeline/haskeline")
+    exists <- doesFileExist xdg
+    home   <- getHomeDirectory
+    readPrefs (if exists then xdg else (home </> ".haskeline"))
 
