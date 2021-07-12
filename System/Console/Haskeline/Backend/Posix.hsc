@@ -1,3 +1,5 @@
+{-# LANGUAGE CApiFFI #-}
+
 module System.Console.Haskeline.Backend.Posix (
                         withPosixGetEvent,
                         posixLayouts,
@@ -61,7 +63,7 @@ ehOut = eH . hOut
 -------------------
 -- Window size
 
-foreign import ccall ioctl :: FD -> CULong -> Ptr a -> IO CInt
+foreign import capi "sys/ioctl.h ioctl" ioctl :: FD -> CULong -> Ptr a -> IO CInt
 
 posixLayouts :: Handles -> [IO (Maybe Layout)]
 posixLayouts h = [ioctlLayout $ ehOut h, envLayout]
