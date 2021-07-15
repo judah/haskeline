@@ -6,7 +6,9 @@ module System.Console.Haskeline.Completion(
                             fallbackCompletion,
                             -- * Word completion
                             completeWord,
+                            completeWord',
                             completeWordWithPrev,
+                            completeWordWithPrev',
                             completeQuotedWord,
                             -- * Filename completion
                             completeFilename,
@@ -59,6 +61,14 @@ completeWord :: Monad m => Maybe Char
         -> CompletionFunc m
 completeWord esc ws = completeWordWithPrev esc ws . const
 
+-- | The same as 'completeWord' but takes a predicate for the whitespace characters
+completeWord' :: Monad m => Maybe Char
+        -- ^ An optional escape character
+        -> (Char -> Bool) -- ^ Characters which count as whitespace
+        -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
+        -> CompletionFunc m
+completeWord' esc ws = completeWordWithPrev' esc ws . const
+
 -- | A custom 'CompletionFunc' which completes the word immediately to the left of the cursor,
 -- and takes into account the line contents to the left of the word.
 --
@@ -71,16 +81,27 @@ completeWordWithPrev :: Monad m => Maybe Char
             -- line contents to the left of the word, reversed.  The second argument is the word
             -- to be completed.
         -> CompletionFunc m
-completeWordWithPrev esc ws f (line, _) = do
+completeWordWithPrev esc ws = completeWordWithPrev' esc (`elem` ws)
+
+-- | The same as 'completeWordWithPrev' but takes a predicate for the whitespace characters
+completeWordWithPrev' :: Monad m => Maybe Char
+        -- ^ An optional escape character
+        -> (Char -> Bool) -- ^ Characters which count as whitespace
+        -> (String ->  String -> m [Completion])
+            -- ^ Function to produce a list of possible completions.  The first argument is the
+            -- line contents to the left of the word, reversed.  The second argument is the word
+            -- to be completed.
+        -> CompletionFunc m
+completeWordWithPrev' esc wpred f (line, _) = do
     let (word,rest) = case esc of
-                        Nothing -> break (`elem` ws) line
+                        Nothing -> break wpred line
                         Just e -> escapedBreak e line
     completions <- f rest (reverse word)
-    return (rest,map (escapeReplacement esc ws) completions)
+    return (rest,map (escapeReplacement esc wpred) completions)
   where
-    escapedBreak e (c:d:cs) | d == e && c `elem` (e:ws)
+    escapedBreak e (c:d:cs) | d == e && (c == e || wpred c)
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
-    escapedBreak e (c:cs) | notElem c ws
+    escapedBreak e (c:cs) | not $ wpred c
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
     escapedBreak _ cs = ("",cs)
 
@@ -105,12 +126,12 @@ completion str = Completion str str True
 setReplacement :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
 
-escapeReplacement :: Maybe Char -> String -> Completion -> Completion
-escapeReplacement esc ws f = case esc of
+escapeReplacement :: Maybe Char -> (Char -> Bool) -> Completion -> Completion
+escapeReplacement esc wpred f = case esc of
     Nothing -> f
     Just e -> f {replacement = escape e (replacement f)}
   where
-    escape e (c:cs) | c `elem` (e:ws)     = e : c : escape e cs
+    escape e (c:cs) | c == e || wpred c = e : c : escape e cs
                     | otherwise = c : escape e cs
     escape _ "" = ""
 
@@ -127,7 +148,7 @@ completeQuotedWord esc qs completer alterative line@(left,_)
   = case splitAtQuote esc qs left of
     Just (w,rest) | isUnquoted esc qs rest -> do
         cs <- completer (reverse w)
-        return (rest, map (addQuotes . escapeReplacement esc qs) cs)
+        return (rest, map (addQuotes . escapeReplacement esc (`elem` qs)) cs)
     _ -> alterative line
 
 addQuotes :: Completion -> Completion
