@@ -138,18 +138,17 @@ keyEventLoop readEvents eventChan = do
     isEmpty <- atomically $ isEmptyTChan eventChan
     if not isEmpty
         then atomically $ readTChan eventChan
-        else do
-            tid <- forkIO $ handleErrorEvent readerLoop
-            atomically (readTChan eventChan) `finally` killThread tid
+        else handleErrorEvent readerLoop
   where
+    readerLoop :: IO Event
     readerLoop = do
         es <- readEvents
-        if null es
-            then readerLoop
-            else atomically $ mapM_ (writeTChan eventChan) es
-    handleErrorEvent = handle $ \e -> case fromException e of
-                                Just ThreadKilled -> return ()
-                                _ -> atomically $ writeTChan eventChan (ErrorEvent e)
+        case es of
+          [] -> readerLoop
+          e : rest -> do atomically $ mapM_ (writeTChan eventChan) rest
+                         return e
+
+    handleErrorEvent = handle $ \e -> return (ErrorEvent e)
 
 saveKeys :: TChan Event -> [Key] -> IO ()
 saveKeys ch = atomically . writeTChan ch . KeyInput

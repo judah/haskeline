@@ -66,19 +66,23 @@ eventReader :: HANDLE -> IO [Event]
 eventReader h = do
     let waitTime = 500 -- milliseconds
     ret <- c_WaitForSingleObject h waitTime
-    yield -- otherwise, the above foreign call causes the loop to never
-          -- respond to the killThread
     if ret /= (#const WAIT_OBJECT_0)
         then eventReader h
         else do
             es <- readEvents h
             return $ combineSurrogatePairs $ mapMaybe processEvent es
 
+isSurrogatePair :: Char -> Char -> Maybe Char
+isSurrogatePair c1 c2
+    | 0xD800 <= ord c1 && ord c1 < 0xDC00 && 0xDC00 <= ord c2 && ord c2 < 0xE000
+    = Just $ (((ord c1 .&. 0x3FF) `shiftL` 10) .|. (ord c2 .&. 0x3FF)) + 0x10000
+    | otherwise
+    = Nothing
+
 combineSurrogatePairs :: [Event] -> [Event]
 combineSurrogatePairs (KeyInput [Key m1 (KeyChar c1)] : KeyInput [Key _ (KeyChar c2)] : es)
-    | 0xD800 <= ord c1 && ord c1 < 0xDC00 && 0xDC00 <= ord c2 && ord c2 < 0xE000
-    = let c = (((ord c1 .&. 0x3FF) `shiftL` 10) .|. (ord c2 .&. 0x3FF)) + 0x10000
-      in KeyInput [Key m1 (KeyChar (chr c))] : combineSurrogatePairs es
+    | Just c <- isSurrogatePair c1 c2
+    = KeyInput [Key m1 (KeyChar (chr c))] : combineSurrogatePairs es
 combineSurrogatePairs (e:es) = e : combineSurrogatePairs es
 combineSurrogatePairs [] = []
 
