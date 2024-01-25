@@ -8,7 +8,8 @@ module System.Console.Haskeline.Key(Key(..),
             ctrlChar,
             metaKey,
             ctrlKey,
-            parseKey
+            parseKey,
+            setControlBits
             ) where
 
 import Data.Bits
