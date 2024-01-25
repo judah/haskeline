@@ -67,7 +67,7 @@ Library
                    directory>=1.1 && < 1.4, bytestring>=0.9 && < 0.13,
                    filepath >= 1.2 && < 1.6, transformers >= 0.2 && < 0.7,
                    process >= 1.0 && < 1.7, stm >= 2.4 && < 2.6,
-                   exceptions == 0.10.*
+                   exceptions == 0.10.*, async == 2.2.*
     Default-Language: Haskell98
     Default-Extensions:
                 ForeignFunctionInterface, Rank2Types, FlexibleInstances,
