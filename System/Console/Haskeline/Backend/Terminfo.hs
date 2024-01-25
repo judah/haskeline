@@ -125,9 +125,9 @@ evalDraw term actions = EvalTerm eval liftE
                             . unDraw 
  
 
-runTerminfoDraw :: Handles -> MaybeT IO RunTerm
-runTerminfoDraw h = do
-    mterm <- liftIO $ Exception.try setupTermFromEnv
+runTerminfoDraw :: Maybe String -> Handles -> MaybeT IO RunTerm
+runTerminfoDraw termtype h = do
+    mterm <- liftIO $ Exception.try $ maybe setupTermFromEnv setupTerm termtype
     case mterm of
         Left (_::SetupTermError) -> mzero
         Right term -> do

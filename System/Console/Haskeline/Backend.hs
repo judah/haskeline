@@ -23,27 +23,39 @@ defaultRunTerm = (liftIO (hGetEcho stdin) >>= guard >> stdinTTY)
 terminalRunTerm :: IO RunTerm
 terminalRunTerm = directTTY `orElse` fileHandleRunTerm stdin
 
+#ifndef MINGW
+useTermHandlesRunTerm :: Maybe String -> Handle -> Handle -> IO RunTerm
+useTermHandlesRunTerm termtype input output =
+    explicitTTY termtype input output `orElse` fileHandleRunTerm input
+#endif
+
 stdinTTY :: MaybeT IO RunTerm
 #ifdef MINGW
 stdinTTY = win32TermStdin
 #else
-stdinTTY = stdinTTYHandles >>= runDraw
+stdinTTY = stdinTTYHandles >>= runDraw Nothing
 #endif
 
 directTTY :: MaybeT IO RunTerm
 #ifdef MINGW
 directTTY = win32Term
 #else
-directTTY = ttyHandles >>= runDraw
+directTTY = ttyHandles >>= runDraw Nothing
+#endif
+
+#ifndef MINGW
+explicitTTY :: Maybe String -> Handle -> Handle -> MaybeT IO RunTerm
+explicitTTY termtype input output =
+    explicitTTYHandles input output >>= runDraw termtype
 #endif
 
 
 #ifndef MINGW
-runDraw :: Handles -> MaybeT IO RunTerm
+runDraw :: Maybe String -> Handles -> MaybeT IO RunTerm
 #ifndef TERMINFO
-runDraw = runDumbTerm
+runDraw _termtype = runDumbTerm
 #else
-runDraw h = runTerminfoDraw h `mplus` runDumbTerm h
+runDraw termtype h = runTerminfoDraw termtype h `mplus` runDumbTerm h
 #endif
 #endif
 

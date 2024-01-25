@@ -11,6 +11,7 @@ module System.Console.Haskeline.Backend.Posix (
                         mapLines,
                         stdinTTYHandles,
                         ttyHandles,
+                        explicitTTYHandles,
                         posixRunTerm,
                         fileRunTerm
                  ) where
@@ -286,6 +287,15 @@ openTerm :: IOMode -> MaybeT IO ExternalHandle
 openTerm mode = handle (\(_::IOException) -> mzero)
             $ liftIO $ openInCodingMode "/dev/tty" mode
 
+explicitTTYHandles :: Handle -> Handle -> MaybeT IO Handles
+explicitTTYHandles h_in h_out = do
+    isInTerm <- liftIO $ hIsTerminalDevice h_in
+    guard isInTerm
+    return Handles
+            { hIn = externalHandle h_in
+            , hOut = externalHandle h_out
+            , closeHandles = return ()
+            }
 
 posixRunTerm ::
     Handles

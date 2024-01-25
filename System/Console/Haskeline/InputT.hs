@@ -216,6 +216,16 @@ useFile file = Behavior $ do
 preferTerm :: Behavior
 preferTerm = Behavior terminalRunTerm
 
+#ifndef MINGW
+-- | Use terminal-style interaction on the given input and output handles.  The terminal
+-- type may also be explicitly specified.
+--
+-- This behavior is for dealing with terminals other than the controlling terminal.
+-- The caller is responsible for closing handles after use.  Not available on Windows.
+useTermHandles :: Maybe String -> Handle -> Handle -> Behavior
+useTermHandles termtype input output =
+    Behavior $ useTermHandlesRunTerm termtype input output
+#endif
 
 -- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
