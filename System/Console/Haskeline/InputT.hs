@@ -181,6 +181,7 @@ execInputT prefs settings run (InputT f)
     = runReaderT' settings $ runReaderT' prefs
             $ runKillRing
             $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs)
+              (incAppendHistory prefs)
             $ runReaderT f run
 
 -- | Map a user interaction by modifying the base monad computation.

@@ -62,7 +62,7 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
         then readUTF8File file
         else return ""
     _ <- evaluate (length contents) -- force file closed
-    return History {histLines = Seq.fromList $ lines contents,
+    return History {histLines = Seq.fromList $ reverse $ lines contents,
                     stifleAmt = Nothing}
 
 -- | Writes the line history to the given file.  If there is an
@@ -70,7 +70,7 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
 writeHistory :: FilePath -> History -> IO ()
 writeHistory file = handle (\(_::IOException) -> return ())
         . writeUTF8File file
-        . unlines . historyLines 
+        . unlines . reverse . historyLines
 
 -- | Limit the number of lines stored in the history.
 stifleHistory :: Maybe Int -> History -> History

@@ -94,6 +94,7 @@ import System.Console.Haskeline.RunCommand
 import Control.Monad.Catch (MonadMask, handle)
 import Data.Char (isSpace, isPrint)
 import Data.Maybe (isJust)
+import Control.Monad (when)
 import System.IO
 
 
@@ -188,13 +189,18 @@ maybeAddHistory :: forall m . MonadIO m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates
+    doFlush <- InputT $ asks incAppendHistory
     case result of
         Just line | autoAddHistory settings && not (all isSpace line)
             -> let adder = case histDupes of
                         AlwaysAdd -> addHistory
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
                         IgnoreAll -> addHistoryRemovingAllDupes
-               in modifyHistory (adder line)
+               in do
+                 modifyHistory (adder line)
+                 when doFlush $ case historyFile settings of
+                   Nothing -> pure ()
+                   Just f -> liftIO $ appendFile f (line ++ "\n")
         _ -> return ()
 
 ----------
