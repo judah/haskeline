@@ -1,0 +1,14 @@
+* text=auto
+*.c text
+*.hs* text
+*.h text
+*.txt text
+*.sh text
+Makefile text
+*.md text
+LICENSE text
+README* text
+Changelog text
+*.y*ml text
+.git* text
+*.cabal text
