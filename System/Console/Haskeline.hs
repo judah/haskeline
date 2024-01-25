@@ -330,7 +330,7 @@ promptedInput doTerm doFile prompt = do
 of type 'Interrupt'.  For example:
 
 > tryAction :: InputT IO ()
-> tryAction = handle (\Interrupt -> outputStrLn "Cancelled.")
+> tryAction = handleInterrupt (outputStrLn "Cancelled.")
 >                $ withInterrupt $ someLongAction
 
 The action can handle the interrupt itself; a new 'Interrupt' exception will be thrown
@@ -338,7 +338,7 @@ every time Ctrl-C is pressed.
 
 > tryAction :: InputT IO ()
 > tryAction = withInterrupt loop
->     where loop = handle (\Interrupt -> outputStrLn "Cancelled; try again." >> loop)
+>     where loop = handleInterrupt (outputStrLn "Cancelled; try again." >> loop)
 >                    someLongAction
 
 This behavior differs from GHC's built-in Ctrl-C handling, which
@@ -351,9 +351,10 @@ withInterrupt act = do
     rterm <- InputT ask
     wrapInterrupt rterm act
 
--- | Catch and handle an exception of type 'Interrupt'.
+-- | Catch and handle an exception of type 'Interrupt'. See 'withInterrupt' for
+-- more explanation.
 --
--- > handleInterrupt f = handle $ \Interrupt -> f
+-- > handleInterrupt (outputStrLn "Ctrl+C was pressed, aborting!") someLongAction
 handleInterrupt :: MonadMask m => m a -> m a -> m a
 handleInterrupt f = handle $ \Interrupt -> f
 
