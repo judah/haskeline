@@ -189,6 +189,11 @@ mapInputT f = InputT . mapReaderT (mapReaderT (mapReaderT
                                   (mapReaderT (mapReaderT f))))
                     . unInputT
 
+mapInputT_ :: (m () -> m ()) -> InputT m () -> InputT m ()
+mapInputT_ f = InputT . mapReaderT (mapReaderT (mapReaderT
+                                  (mapReaderT (mapReaderT f))))
+                    . unInputT
+
 -- | Read input from 'stdin'.  
 -- Use terminal-style interaction if 'stdin' is connected to
 -- a terminal and has echoing enabled.  Otherwise (e.g., if 'stdin' is a pipe), use
